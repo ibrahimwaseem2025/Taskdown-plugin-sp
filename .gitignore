@@ -1,0 +1,15 @@
+dist/
+*.zip
+
+.DS_Store
+Thumbs.db
+
+node_modules/
+
+.env
+.env.*
+
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -1,0 +1,14 @@
+{
+  "id": "bulk-add-tasks",
+  "name": "Bulk Add Tasks",
+  "version": "0.1.0",
+  "description": "Create many Super Productivity tasks at once from pasted text, with project headings, subtasks, existing tags and inline notes.",
+  "manifestVersion": 1,
+  "minSupVersion": "18.16.0",
+  "author": "initialcrow",
+  "hooks": [],
+  "permissions": ["getAllProjects", "getAllTags", "addTask", "showSnack"],
+  "iFrame": true,
+  "sidePanel": false,
+  "uiKit": true
+}
