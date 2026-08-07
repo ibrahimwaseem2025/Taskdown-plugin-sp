@@ -30,9 +30,50 @@ Buy coffee #errands ((Use the discount card))
 Call dentist
 ```
 
+## Install
+
+Download the release ZIP file:
+
+```text
+bulk-add-tasks-v0.1.0.zip
+```
+
+Then install it from Super Productivity:
+
+1. Open Super Productivity.
+2. Go to the plugin management screen.
+3. Choose the option to install or import a plugin from a ZIP file.
+4. Select `bulk-add-tasks-v0.1.0.zip`.
+5. Enable the plugin if Super Productivity does not enable it automatically.
+
+The ZIP must contain `manifest.json` and `index.html` at the archive root. Do not import the whole source folder unless you are installing it for development.
+
+## Use
+
+Open the plugin from Super Productivity's plugin menu, paste your task list, choose the default project and tags if needed, then click `Preview`.
+
+If the preview is correct, click `Create tasks`.
+
+The plugin only uses existing projects and tags. If a project heading or tag does not exist in Super Productivity, the preview shows an error and blocks the import.
+
+## Syntax
+
+```text
+[Project Name]
+Parent task #tag ((task note))
+  Child task
+  Another child task ((child note))
+```
+
+- `[Project Name]` changes the current project.
+- Indentation creates subtasks.
+- Existing `#tags` are added to the task and removed from the title.
+- `((notes))` are added as task notes and removed from the title.
+- Common bullets such as `-`, `*`, `[ ]`, and `[x]` can be stripped automatically.
+
 ## Install for development
 
-Use Super Productivity's plugin management screen and load the plugin folder (or install the release ZIP, depending on your version).
+Load this folder from Super Productivity's plugin management screen, or build and import the release ZIP.
 
 ## Development notes
 
