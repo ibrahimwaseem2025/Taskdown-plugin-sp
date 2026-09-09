@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Verify release version
+        run: |
+          node -e 'const { version } = require("./manifest.json"); if (process.env.GITHUB_REF_NAME !== `v${version}`) throw new Error("Tag must match manifest version");'
+
+      - name: Run regression tests
+        run: node --test tests/*.test.cjs
+
+      - name: Build release ZIP
+        run: bash scripts/package-release.sh
+
+      - name: Publish release with installable ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          RELEASE_ARCHIVE="$(node -p 'const { id, version } = require("./manifest.json"); `dist/${id}-v${version}.zip`')"
+          gh release create "$GITHUB_REF_NAME" "$RELEASE_ARCHIVE" \
+            --verify-tag --title "$GITHUB_REF_NAME" --notes-from-tag

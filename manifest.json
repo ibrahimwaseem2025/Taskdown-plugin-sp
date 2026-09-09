@@ -1,7 +1,7 @@
 {
   "id": "bulk-add-tasks",
   "name": "Bulk Add Tasks",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Create many Super Productivity tasks at once from pasted text, with project headings, subtasks, existing tags and inline notes.",
   "manifestVersion": 1,
   "minSupVersion": "18.16.0",

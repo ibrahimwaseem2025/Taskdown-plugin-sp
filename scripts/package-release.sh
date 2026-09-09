@@ -5,11 +5,12 @@ set -euo pipefail
 # Author: initialcrow
 #
 # Prepare a minimal production archive for Super Productivity.
-# The final ZIP contains only manifest.json and index.html at the root.
+# The final ZIP contains manifest.json, index.html, and LICENSE at the root.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST_FILE="$ROOT_DIR/manifest.json"
 INDEX_FILE="$ROOT_DIR/index.html"
+LICENSE_FILE="$ROOT_DIR/LICENSE"
 DIST_DIR="$ROOT_DIR/dist"
 
 if ! command -v node >/dev/null 2>&1; then
@@ -34,14 +35,15 @@ ZIP_FILE="$DIST_DIR/${RELEASE_NAME}.zip"
 rm -rf "$RELEASE_DIR" "$ZIP_FILE" "$ROOT_DIR/${RELEASE_NAME}.zip"
 mkdir -p "$RELEASE_DIR"
 
-# Only the files required by the iframe runtime are copied.
+# Include the runtime files and the license for distribution.
 cp "$MANIFEST_FILE" "$RELEASE_DIR/manifest.json"
 cp "$INDEX_FILE" "$RELEASE_DIR/index.html"
+cp "$LICENSE_FILE" "$RELEASE_DIR/LICENSE"
 
-# Keep both files at the archive root for direct Super Productivity import.
+# Keep the files at the archive root for direct Super Productivity import.
 (
   cd "$RELEASE_DIR"
-  zip -q "$ZIP_FILE" manifest.json index.html
+  zip -q "$ZIP_FILE" manifest.json index.html LICENSE
 )
 
 echo "Prepared $RELEASE_DIR"

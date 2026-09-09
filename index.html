@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bulk Add Tasks</title>
-  <!-- Bulk Add Tasks for Super Productivity v0.1.0. Author: initialcrow. -->
+  <!-- Bulk Add Tasks for Super Productivity v0.1.1. Author: initialcrow. -->
   <style>
     /* The iframe receives Super Productivity theme variables from the host. */
     * { box-sizing: border-box; }
@@ -168,6 +168,7 @@
           <span id="success" class="success"></span>
         </div>
         <div id="errors"></div>
+        <div id="importError" class="error-box" role="alert" hidden></div>
         <div id="preview" class="preview" hidden>
           <h2>Preview</h2>
           <div id="previewList" class="preview-list"></div>
@@ -204,7 +205,8 @@
         </div>
 
         <div class="hint">
-          Indentation is relative: any deeper indentation becomes a child of the nearest preceding task.
+          Indentation is relative. Only two levels are supported: tasks and their subtasks.
+          A subtask cannot have its own subtasks.
           Project headings are matched case-insensitively against existing projects.
         </div>
       </aside>
@@ -226,6 +228,7 @@
         tags: [],
         parsed: [],
         errors: [],
+        isImporting: false,
       };
 
       // Cache interactive elements once so handlers stay focused on behavior.
@@ -241,9 +244,15 @@
         summary: $('summary'),
         success: $('success'),
         errors: $('errors'),
+        importError: $('importError'),
         preview: $('preview'),
         previewList: $('previewList'),
       };
+
+      const inputControls = [
+        els.tasks, els.project, els.tags,
+        els.parseTags, els.parseNotes, els.stripBullets,
+      ];
 
       // Escape values before HTML insertion so pasted content never becomes active markup.
       function escapeHtml(value) {
@@ -453,11 +462,16 @@
             parentStack.pop();
           }
           const parentIndex = parentStack.at(-1)?.rowIndex ?? null;
+          const depth = parentIndex === null ? 0 : rows[parentIndex].depth + 1;
+          if (depth > 1) {
+            errors.push(`Line ${index + 1}: subtasks cannot have subtasks. Reduce indentation to keep only two levels: tasks and subtasks.`);
+          }
 
           const row = {
             line: index + 1,
             title,
             indent,
+            depth,
             parentIndex,
             projectId: currentProjectId,
             tagIds: tagResult.tagIds,
@@ -478,14 +492,12 @@
 
       // Rebuild the preview and keep the import button state in sync.
       function renderPreview() {
+        if (state.isImporting) return;
         const parsed = parseInput();
         state.parsed = parsed.rows;
         state.errors = parsed.errors;
-        els.success.textContent = '';
 
         els.previewList.innerHTML = parsed.rows.map((row) => {
-          // Preview indentation is visual only; it does not change the API payload.
-          const depth = row.parentIndex === null ? 0 : Math.max(1, Math.floor(row.indent / 2));
           const tagTitles = row.tagIds
             .map((id) => state.tags.find((t) => t.id === id)?.title)
             .filter(Boolean);
@@ -493,7 +505,7 @@
             .filter(Boolean)
             .join(' · ');
           const note = row.notes ? `<div class="note-preview">${escapeHtml(row.notes)}</div>` : '';
-          return `<div class="preview-row" style="padding-left:${7 + depth * 20}px">${escapeHtml(row.title)}<span class="meta">${escapeHtml(meta)}</span>${note}</div>`;
+          return `<div class="preview-row" style="padding-left:${7 + row.depth * 20}px">${escapeHtml(row.title)}<span class="meta">${escapeHtml(meta)}</span>${note}</div>`;
         }).join('');
 
         els.preview.hidden = parsed.rows.length === 0;
@@ -504,8 +516,18 @@
         els.importBtn.disabled = parsed.rows.length === 0 || parsed.errors.length > 0;
       }
 
+      // Notifications are supplementary; their failure must not change the import result.
+      async function showImportNotification(msg, type) {
+        try {
+          await plugin.showSnack({ msg, type });
+        } catch (error) {
+          console.error('[Bulk Add Tasks] Notification failed', error);
+        }
+      }
+
       // Create tasks in order so child rows can reuse the id of their newly-created parent.
       async function importTasks() {
+        if (state.isImporting) return;
         plugin = getPluginApi();
         if (!plugin) {
           showApiUnavailableError();
@@ -515,14 +537,20 @@
         renderPreview();
         if (state.errors.length || !state.parsed.length) return;
 
+        // Keep this import tied to the validated input until every request has settled.
+        const rows = state.parsed;
+        state.isImporting = true;
+        inputControls.forEach((control) => { control.disabled = true; });
         els.importBtn.disabled = true;
         els.previewBtn.disabled = true;
+        els.importError.hidden = true;
+        els.importError.textContent = '';
         els.success.textContent = 'Creating…';
 
         const createdIds = [];
         try {
-          for (let i = 0; i < state.parsed.length; i++) {
-            const row = state.parsed[i];
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
             const parentId = row.parentIndex === null ? null : createdIds[row.parentIndex];
             const id = await plugin.addTask({
               title: row.title,
@@ -532,31 +560,29 @@
               notes: row.notes,
             });
             createdIds.push(id);
-            els.success.textContent = `Creating ${i + 1}/${state.parsed.length}…`;
+            els.success.textContent = `Creating ${i + 1}/${rows.length}…`;
           }
 
-          plugin.showSnack({
-            msg: `${createdIds.length} task(s) created`,
-            type: 'SUCCESS',
-          });
           els.success.textContent = `${createdIds.length} task(s) created.`;
           els.tasks.value = '';
-          state.parsed = [];
-          els.preview.hidden = true;
-          els.previewList.innerHTML = '';
-          els.summary.textContent = '';
         } catch (error) {
           console.error('[Bulk Add Tasks] Import failed', error);
-          plugin.showSnack({
-            msg: `Import stopped after ${createdIds.length} task(s).`,
-            type: 'ERROR',
-          });
-          els.errors.innerHTML = `<div class="error-box">Import stopped after ${createdIds.length} task(s). Check the developer console for details.</div>`;
+          const failedRow = rows[createdIds.length];
+          els.importError.textContent = `Import stopped after ${createdIds.length} task(s) confirmed created. Failed on line ${failedRow.line}: "${failedRow.title}". Your text has been kept. Check the tasks already present in Super Productivity before retrying: importing the same list again can create duplicates. Check the developer console for error details.`;
+          els.importError.hidden = false;
           els.success.textContent = '';
         } finally {
+          state.isImporting = false;
+          inputControls.forEach((control) => { control.disabled = false; });
           els.previewBtn.disabled = false;
           renderPreview();
         }
+
+        const completed = createdIds.length === rows.length;
+        await showImportNotification(
+          completed ? `${createdIds.length} task(s) created` : `Import stopped after ${createdIds.length} task(s).`,
+          completed ? 'SUCCESS' : 'ERROR',
+        );
       }
 
       // Load existing projects and tags through the official iframe Plugin API.
@@ -594,12 +620,25 @@
         }
       }
 
-      // UI events: explicit preview and import invalidation after text changes.
-      els.previewBtn.addEventListener('click', renderPreview);
-      els.importBtn.addEventListener('click', importTasks);
-      els.tasks.addEventListener('input', () => {
+      // A changed input or option requires a fresh preview before importing.
+      function invalidatePreview() {
+        if (state.isImporting) return;
+        state.parsed = [];
+        state.errors = [];
+        els.preview.hidden = true;
+        els.previewList.innerHTML = '';
+        els.summary.textContent = '';
+        els.errors.innerHTML = '';
         els.importBtn.disabled = true;
         els.success.textContent = '';
+        // Keep a partial import warning visible while the user corrects the input.
+      }
+
+      els.previewBtn.addEventListener('click', renderPreview);
+      els.importBtn.addEventListener('click', importTasks);
+      els.tasks.addEventListener('input', invalidatePreview);
+      inputControls.filter((control) => control !== els.tasks).forEach((control) => {
+        control.addEventListener('change', invalidatePreview);
       });
 
       // onReady is the recommended iframe path, after PluginAPI injection is confirmed.
