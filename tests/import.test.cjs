@@ -237,3 +237,84 @@ test('notification failure does not hide a partial import report', async () => {
   assert.equal(app.el('importError').hidden, false);
   assert.match(app.el('importError').textContent, /after 1 task\(s\) confirmed created/);
 });
+
+for (const failOn of [1, 2]) {
+  test(`unchanged failed input cannot be retried after failure on task ${failOn}`, async () => {
+    const input = 'Task A\nTask B';
+    const app = await loadPlugin(input, {
+      beforeAdd(data, count) { if (count === failOn) throw new Error('Host error'); },
+    });
+    await app.import();
+    const report = app.el('importError').textContent;
+    assert.equal(app.el('importBtn').disabled, true);
+    await app.import();
+    app.preview();
+    await app.import();
+    for (const id of controlIds) {
+      app.el(id).emit(id === 'tasks' ? 'input' : 'change');
+      app.preview();
+      assert.equal(app.el('importBtn').disabled, true);
+      await app.import();
+    }
+    assert.equal(app.calls.length, failOn);
+    assert.equal(app.created.length, failOn - 1);
+    assert.equal(app.el('importError').hidden, false);
+    assert.equal(app.el('importError').textContent, report);
+
+    // Editing and then undoing the edit must not unlock the original failed list.
+    app.el('tasks').value = 'Revised list';
+    app.el('tasks').emit('input');
+    app.preview();
+    assert.equal(app.el('importBtn').disabled, false);
+    app.el('tasks').value = input;
+    app.el('tasks').emit('input');
+    app.preview();
+    await app.import();
+    assert.equal(app.el('importBtn').disabled, true);
+    assert.equal(app.calls.length, failOn);
+  });
+}
+
+test('edited retry keeps the report visible while pending and clears it on success', async () => {
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const app = await loadPlugin('Task A\nTask B', {
+    beforeAdd(data, count) {
+      if (count === 2) throw new Error('Host error');
+      if (count === 3) return pending;
+    },
+  });
+  await app.import();
+  const report = app.el('importError').textContent;
+  app.el('tasks').value = 'Task B';
+  app.el('tasks').emit('input');
+  assert.equal(app.el('importBtn').disabled, true);
+  app.preview();
+  assert.equal(app.el('importBtn').disabled, false);
+  const retrying = app.import();
+  assert.equal(app.el('importError').hidden, false);
+  assert.equal(app.el('importError').textContent, report);
+  release();
+  await retrying;
+  assert.deepEqual(app.created.map((task) => task.title), ['Task A', 'Task B']);
+  assert.equal(app.el('importError').hidden, true);
+  assert.equal(app.el('importError').textContent, '');
+  assert.equal(app.el('success').textContent, '1 task(s) created.');
+});
+
+test('a second failure blocks its revised input and updates the visible report', async () => {
+  const app = await loadPlugin('Task A\nTask B', {
+    beforeAdd(data, count) { if (count >= 2) throw new Error('Host error'); },
+  });
+  await app.import();
+  app.el('tasks').value = 'Task B';
+  app.el('tasks').emit('input');
+  app.preview();
+  await app.import();
+  assert.equal(app.el('importBtn').disabled, true);
+  assert.equal(app.el('importError').hidden, false);
+  assert.match(app.el('importError').textContent, /after 0 task\(s\) confirmed created/);
+  assert.match(app.el('importError').textContent, /Failed on line 1: "Task B"/);
+  await app.import();
+  assert.equal(app.calls.length, 3);
+});

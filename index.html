@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bulk Add Tasks</title>
-  <!-- Bulk Add Tasks for Super Productivity v0.1.1. Author: initialcrow. -->
+  <!-- Bulk Add Tasks for Super Productivity v0.1.2. Author: initialcrow. -->
   <style>
     /* The iframe receives Super Productivity theme variables from the host. */
     * { box-sizing: border-box; }
@@ -229,6 +229,7 @@
         parsed: [],
         errors: [],
         isImporting: false,
+        failedInput: null,
       };
 
       // Cache interactive elements once so handlers stay focused on behavior.
@@ -490,6 +491,11 @@
         return state.projects.find((p) => p.id === id)?.title || 'Unknown project';
       }
 
+      // An unchanged failed list must not be submitted again, even after another preview.
+      function isRetryBlocked() {
+        return state.failedInput !== null && els.tasks.value === state.failedInput;
+      }
+
       // Rebuild the preview and keep the import button state in sync.
       function renderPreview() {
         if (state.isImporting) return;
@@ -513,7 +519,7 @@
         els.errors.innerHTML = parsed.errors.length
           ? `<div class="error-box"><strong>Fix before importing:</strong><br>${parsed.errors.map(escapeHtml).join('<br>')}</div>`
           : '';
-        els.importBtn.disabled = parsed.rows.length === 0 || parsed.errors.length > 0;
+        els.importBtn.disabled = parsed.rows.length === 0 || parsed.errors.length > 0 || isRetryBlocked();
       }
 
       // Notifications are supplementary; their failure must not change the import result.
@@ -527,7 +533,7 @@
 
       // Create tasks in order so child rows can reuse the id of their newly-created parent.
       async function importTasks() {
-        if (state.isImporting) return;
+        if (state.isImporting || isRetryBlocked()) return;
         plugin = getPluginApi();
         if (!plugin) {
           showApiUnavailableError();
@@ -539,12 +545,11 @@
 
         // Keep this import tied to the validated input until every request has settled.
         const rows = state.parsed;
+        const input = els.tasks.value;
         state.isImporting = true;
         inputControls.forEach((control) => { control.disabled = true; });
         els.importBtn.disabled = true;
         els.previewBtn.disabled = true;
-        els.importError.hidden = true;
-        els.importError.textContent = '';
         els.success.textContent = 'Creating…';
 
         const createdIds = [];
@@ -565,10 +570,14 @@
 
           els.success.textContent = `${createdIds.length} task(s) created.`;
           els.tasks.value = '';
+          state.failedInput = null;
+          els.importError.hidden = true;
+          els.importError.textContent = '';
         } catch (error) {
           console.error('[Bulk Add Tasks] Import failed', error);
+          state.failedInput = input;
           const failedRow = rows[createdIds.length];
-          els.importError.textContent = `Import stopped after ${createdIds.length} task(s) confirmed created. Failed on line ${failedRow.line}: "${failedRow.title}". Your text has been kept. Check the tasks already present in Super Productivity before retrying: importing the same list again can create duplicates. Check the developer console for error details.`;
+          els.importError.textContent = `Import stopped after ${createdIds.length} task(s) confirmed created. Failed on line ${failedRow.line}: "${failedRow.title}". Your text has been kept. Check the tasks already present in Super Productivity, then edit your task list and preview it again before retrying. Importing tasks already created can cause duplicates. Check the developer console for error details.`;
           els.importError.hidden = false;
           els.success.textContent = '';
         } finally {

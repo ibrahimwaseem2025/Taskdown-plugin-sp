@@ -1,83 +1,59 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
-echo "------------------------------------"
-echo "CrowBO Framework Git Helper"
-echo "------------------------------------"
+echo "Bulk Add Tasks — commit and publish"
+read -r -p "Publish a new release after this commit? (y/n): " MAKE_RELEASE
+read -r -p "Commit message: " COMMIT_MSG
+if [[ -z "$COMMIT_MSG" ]]; then
+  echo "A commit message is required." >&2
+  exit 1
+fi
 
-echo "1) Commit & (optionally) create a release"
-echo "2) Synchronize latest release tag to current commit"
-read -p "Choose an option (1/2): " ACTION
+BRANCH="$(git symbolic-ref --short HEAD)"
+NOTES_FILE=""
+trap 'if [[ -n "$NOTES_FILE" ]]; then rm -f "$NOTES_FILE"; fi' EXIT
 
-if [[ "$ACTION" == "1" ]]; then
+if [[ "$MAKE_RELEASE" == "y" || "$MAKE_RELEASE" == "Y" ]]; then
+  VERSION="$(node -p 'JSON.parse(require("fs").readFileSync("manifest.json", "utf8")).version')"
+  TAG="v${VERSION}"
+  git check-ref-format "refs/tags/$TAG"
 
-  read -p "Do you want to create a GitHub release after the commit? (y/n): " MAKE_RELEASE
-
-  read -p "Enter commit message: " COMMIT_MSG
-
-  git add .
-  git commit -m "$COMMIT_MSG"
-
-  if [[ "$MAKE_RELEASE" == "y" || "$MAKE_RELEASE" == "Y" ]]; then
-    LAST_TAG=$(git tag --sort=-creatordate | head -n 1)
-    if [[ -n "$LAST_TAG" ]]; then
-      echo "Latest existing tag: $LAST_TAG"
-    else
-      echo "No existing tag found."
-    fi
-    read -p "Enter release version tag (e.g., v1.0.0): " VERSION
-
-    read -p "Is this a pre-release? (y/n): " IS_PRERELEASE
-    PRERELEASE_FLAG=""
-    if [[ "$IS_PRERELEASE" == "y" || "$IS_PRERELEASE" == "Y" ]]; then
-      PRERELEASE_FLAG="--prerelease"
-    fi
-
-    git tag -a "$VERSION" -m "Release $VERSION"
-    git push
-    git push origin "$VERSION"
-
-    echo "Enter release notes (end with CTRL+D):"
-    RELEASE_NOTES=$(cat)
-
-    gh release create "$VERSION" --title "$VERSION" --notes "$RELEASE_NOTES" $PRERELEASE_FLAG
-
-    echo "------------------------------------"
-    echo "GitHub release $VERSION created!"
-    echo "------------------------------------"
-  else
-    git push
-    echo "✅ Commit pushed. No release created."
-  fi
-
-elif [[ "$ACTION" == "2" ]]; then
-
-  LAST_TAG=$(git tag --sort=-creatordate | head -n 1)
-  if [[ -z "$LAST_TAG" ]]; then
-    echo "❌ No tag found in this repository."
+  # Published tags are immutable. Fail before committing if this version exists.
+  if git show-ref --verify --quiet "refs/tags/$TAG"; then
+    echo "$TAG already exists locally. Choose a new version in manifest.json." >&2
     exit 1
   fi
-
-  echo "Latest tag found: $LAST_TAG"
-  read -p "This will move tag '$LAST_TAG' to the current HEAD and update the GitHub release. Continue? (y/n): " CONFIRM
-
-  if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
-    echo "Cancelled."
-    exit 0
+  if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+    echo "$TAG already exists on origin. Choose a new version in manifest.json." >&2
+    exit 1
+  else
+    REMOTE_STATUS=$?
+    if [[ "$REMOTE_STATUS" != "2" ]]; then
+      echo "Could not check remote tags. Nothing was committed or published." >&2
+      exit "$REMOTE_STATUS"
+    fi
   fi
 
-  git tag -d "$LAST_TAG" 2>/dev/null || true
-  git push --delete origin "$LAST_TAG" 2>/dev/null || true
+  node --test tests/*.test.cjs
+  bash scripts/package-release.sh
+  NOTES_FILE="$(mktemp)"
+  echo "Release notes for $TAG (finish with Ctrl+D):"
+  cat > "$NOTES_FILE"
+  if [[ ! -s "$NOTES_FILE" ]]; then
+    echo "Release notes are required." >&2
+    exit 1
+  fi
+fi
 
-  git tag "$LAST_TAG"
-  git push origin "$LAST_TAG"
+git add .
+git commit -m "$COMMIT_MSG"
 
-  echo "✅ Tag '$LAST_TAG' moved to the latest commit and pushed to GitHub."
-  echo "ℹ️ The GitHub release for '$LAST_TAG' now points to the latest commit."
-  echo "⚠️ If your release includes attached binaries/assets, these will stay the same (only source code changes)."
-
+if [[ "$MAKE_RELEASE" == "y" || "$MAKE_RELEASE" == "Y" ]]; then
+  git tag -a "$TAG" -F "$NOTES_FILE"
+  git push --atomic origin "$BRANCH" "refs/tags/$TAG"
+  echo "Pushed $TAG. GitHub Actions will test, build, and publish the release ZIP."
 else
-  echo "❌ Invalid option."
-  exit 1
+  git push origin "$BRANCH"
 fi
