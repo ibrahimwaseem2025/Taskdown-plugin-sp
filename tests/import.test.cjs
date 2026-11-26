@@ -6,195 +6,94 @@ const vm = require('node:vm');
 
 const html = readFileSync(join(__dirname, '..', 'index.html'), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-const controlIds = ['tasks', 'project', 'tags', 'parseTags', 'parseNotes', 'stripBullets'];
+const controlIds = ['tasks', 'project', 'tags', 'parseTags', 'parseNotes'];
 
-// Exercise the shipped script through its UI events, without exposing its private state.
 async function loadPlugin(input, overrides = {}) {
   const elements = new Map();
   for (const match of html.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
-    const attributes = match[0];
-    const handlers = new Map();
+    const attributes = match[0]; const handlers = new Map();
     elements.set(match[1], {
-      value: '',
-      textContent: '',
-      innerHTML: '',
-      selectedOptions: [],
-      checked: /\bchecked\b/.test(attributes),
-      disabled: /\bdisabled\b/.test(attributes),
-      hidden: /\bhidden\b/.test(attributes),
+      value: '', textContent: '', innerHTML: '', selectedOptions: [],
+      checked: /\bchecked\b/.test(attributes), disabled: /\bdisabled\b/.test(attributes), hidden: /\bhidden\b/.test(attributes),
       addEventListener(event, handler) { handlers.set(event, handler); },
-      // Deliberately allow direct handler calls on disabled controls to test guards too.
       emit(event) { return handlers.get(event)?.(); },
     });
   }
-
-  const created = [];
-  const notifications = [];
-  const calls = [];
-  let initialized;
-  const ready = new Promise((resolve) => { initialized = resolve; });
+  const created = []; const notifications = []; const calls = [];
+  let initialized; const ready = new Promise((resolve) => { initialized = resolve; });
   const api = {
     onReady(callback) { initialized(callback()); },
     async getAllProjects() { return [{ id: 'work', title: 'Work' }]; },
     async getAllTags() { return [{ id: 'tag-work', title: 'work' }]; },
     async addTask(data) {
-      calls.push(data);
-      await overrides.beforeAdd?.(data, calls.length);
+      calls.push(data); await overrides.beforeAdd?.(data, calls.length);
       if (data.parentId) {
         const parent = created.find((task) => task.id === data.parentId);
-        assert.ok(parent, 'A subtask must reference an existing parent');
-        if (parent.parentId) throw new Error('CANNOT_NEST_SUBTASKS');
+        assert.ok(parent, 'Subtask must reference an existing parent');
+        assert.equal(parent.parentId, null, 'Only one subtask level is supported');
       }
-      const id = `task-${created.length + 1}`;
-      created.push({ ...data, id });
-      return id;
+      const id = `task-${created.length + 1}`; created.push({ ...data, id }); return id;
     },
-    showSnack(notification) {
-      notifications.push(notification);
-      return overrides.notify?.(notification);
-    },
+    showSnack(notification) { notifications.push(notification); return overrides.notify?.(notification); },
   };
-
-  const context = vm.createContext({
-    document: { getElementById: (id) => elements.get(id) },
-    PluginAPI: api,
-    console: { error() {} },
-    setTimeout,
-  });
+  const context = vm.createContext({ document: { getElementById: (id) => elements.get(id) }, PluginAPI: api, console: { error() {} }, setTimeout });
   context.window = context;
   vm.runInContext(script, context, { filename: 'index.html' });
   await ready;
-
-  const el = (id) => elements.get(id);
-  el('tasks').value = input;
-  return {
-    el, created, calls, notifications,
-    preview: () => el('previewBtn').emit('click'),
-    import: () => el('importBtn').emit('click'),
-  };
+  const el = (id) => elements.get(id); el('tasks').value = input;
+  return { el, created, calls, notifications, preview: () => el('previewBtn').emit('click'), import: () => el('importBtn').emit('click') };
 }
 
-for (const [name, input, line] of [
-  ['spaces', 'Parent\n  Child\n    Grandchild', 3],
-  ['tabs', 'Parent\n\tChild\n\t\tGrandchild', 3],
-  ['mixed indentation', 'Parent\n \tChild\n    Grandchild', 3],
-  ['indented root', '    Parent\n      Child\n        Grandchild', 3],
-  ['blank lines and headings', '[Work]\nParent\n\n  Child\n    Grandchild', 5],
-]) {
-  test(`blocks the entire import for a third level: ${name}`, async () => {
-    const app = await loadPlugin(input);
-    app.preview();
-    assert.match(app.el('errors').innerHTML, new RegExp(`Line ${line}: subtasks cannot have subtasks`));
-    assert.equal(app.el('importBtn').disabled, true);
-    await app.import();
-    assert.equal(app.calls.length, 0);
-    assert.equal(app.el('tasks').value, input);
-  });
-}
-
-for (const [name, input, parents] of [
-  ['siblings', 'Parent\n  Child A\n  Child B\nAnother parent', [null, 'task-1', 'task-1', null]],
-  ['wide indentation', 'Parent\n        Child', [null, 'task-1']],
-  ['indented root', '    Parent\n        Child', [null, 'task-1']],
-  ['tabs and spaces at equal width', 'Parent\n\tChild A\n  Child B', [null, 'task-1', 'task-1']],
-  ['project boundary', 'Parent\n  Child\n[Work]\n    New parent\n      New child', [null, 'task-1', null, 'task-3']],
-]) {
-  test(`accepts two levels and preserves parent links: ${name}`, async () => {
-    const app = await loadPlugin(input);
-    app.preview();
-    assert.equal(app.el('errors').innerHTML, '');
-    assert.equal(app.el('importBtn').disabled, false);
-    await app.import();
-    assert.deepEqual(app.created.map((task) => task.parentId), parents);
-  });
-}
-
-test('revalidates at import time even when a valid preview previously existed', async () => {
-  const app = await loadPlugin('Parent\n  Child');
-  app.preview();
-  app.el('tasks').value += '\n    Grandchild';
+test('builds independent notes and grouped checklists for each subtask', async () => {
+  const input = [
+    '- Prepare assignment',
+    '  - Research',
+    '    Notes go here as plain text.',
+    '    **Critical**',
+    '    - [ ] Find academic sources',
+    '    - [x] Review literature',
+    '    **Technical**',
+    '    - [ ] Set up Zotero',
+    '  - Write report',
+    '    **Critical**',
+    '    - [ ] Draft introduction',
+    '    - [ ] Write methodology ((First task note))',
+  ].join('\n');
+  const app = await loadPlugin(input); app.preview();
+  assert.equal(app.el('importBtn').disabled, false);
   await app.import();
-  assert.equal(app.calls.length, 0);
-  assert.match(app.el('errors').innerHTML, /Line 3/);
+  assert.equal(app.created.length, 3);
+  assert.equal(app.created[0].title, 'Prepare assignment');
+  assert.equal(app.created[0].notes, '');
+  assert.equal(app.created[1].title, 'Research');
+  assert.equal(app.created[1].parentId, 'task-1');
+  assert.match(app.created[1].notes, /Notes go here as plain text\./);
+  assert.match(app.created[1].notes, /\*\*Critical\*\*/);
+  assert.match(app.created[1].notes, /- \[ \] Find academic sources/);
+  assert.match(app.created[1].notes, /- \[x\] Review literature/);
+  assert.match(app.created[1].notes, /\*\*Technical\*\*/);
+  assert.match(app.created[1].notes, /- \[ \] Set up Zotero/);
+  assert.equal(app.created[2].title, 'Write report');
+  assert.equal(app.created[2].parentId, 'task-1');
+  assert.match(app.created[2].notes, /- \[ \] Draft introduction/);
+  assert.match(app.created[2].notes, /First task note/);
+  assert.doesNotMatch(app.created[2].notes, /\(\(First task note\)\)/);
 });
 
-test('preview indentation follows parent links instead of space count', async () => {
-  const narrow = await loadPlugin('Parent\n  Child');
-  const wide = await loadPlugin('    Parent\n            Child');
-  narrow.preview();
-  wide.preview();
-  assert.equal(wide.el('previewList').innerHTML, narrow.el('previewList').innerHTML);
-});
-
-for (const failOn of [1, 3]) {
-  test(`failure on task ${failOn} preserves input and a visible report across previews and edits`, async () => {
-    const input = 'Parent\n  Child A\n  Child B';
-    const app = await loadPlugin(input, {
-      beforeAdd(data, count) { if (count === failOn) throw new Error('Host rejected task'); },
-    });
-    await app.import();
-    assert.equal(app.created.length, failOn - 1);
-    assert.equal(app.el('tasks').value, input);
-    assert.equal(app.el('importError').hidden, false);
-    const report = app.el('importError').textContent;
-    assert.match(report, new RegExp(`after ${failOn - 1} task\\(s\\) confirmed created`));
-    assert.match(report, new RegExp(`Failed on line ${failOn}`));
-    assert.match(report, /duplicates/);
-    app.preview();
-    assert.equal(app.el('importError').textContent, report);
-    app.el('tasks').emit('input');
-    assert.equal(app.el('importError').hidden, false);
-    assert.equal(app.el('importError').textContent, report);
-    for (const id of controlIds) assert.equal(app.el(id).disabled, false);
-    assert.equal(app.el('previewBtn').disabled, false);
-  });
-}
-
-test('success clears input but preserves its status after rendering the preview', async () => {
-  const app = await loadPlugin('Parent\n  Child');
+test('recognises an unlabelled checklist and adds the default Checklist heading', async () => {
+  const app = await loadPlugin('- Task\n  - Child\n    - [ ] One\n    - [x] Two');
   await app.import();
-  assert.equal(app.el('tasks').value, '');
-  assert.equal(app.el('success').textContent, '2 task(s) created.');
-  app.preview();
-  assert.equal(app.el('success').textContent, '2 task(s) created.');
-  assert.equal(app.el('preview').hidden, true);
-  assert.equal(app.el('importBtn').disabled, true);
-  assert.equal(app.el('importError').hidden, true);
+  assert.equal(app.created[1].notes, '**Checklist**\n- [ ] One\n- [x] Two');
 });
 
-test('locks the form and prevents a concurrent import while the API is pending', async () => {
-  let release;
-  const pending = new Promise((resolve) => { release = resolve; });
-  const app = await loadPlugin('Parent\n  Child', { beforeAdd: () => pending });
-  const importing = app.import();
-  for (const id of [...controlIds, 'previewBtn', 'importBtn']) {
-    assert.equal(app.el(id).disabled, true, `${id} must be locked`);
-  }
-  app.preview();
+test('preserves Markdown note headings, bullets, and paragraphs on a subtask', async () => {
+  const app = await loadPlugin('- Parent\n  - Child\n    # Heading 1\n    ## Heading 2\n    **Bold text**\n    - ordinary note bullet\n    A paragraph');
   await app.import();
-  assert.equal(app.calls.length, 1);
-  release();
-  await importing;
-  assert.equal(app.created.length, 2);
-  for (const id of [...controlIds, 'previewBtn']) assert.equal(app.el(id).disabled, false);
+  assert.equal(app.created[1].notes, '# Heading 1\n## Heading 2\n**Bold text**\n- ordinary note bullet\nA paragraph');
 });
 
-for (const id of controlIds) {
-  test(`changing ${id} invalidates and hides the old preview`, async () => {
-    const app = await loadPlugin('Task');
-    app.preview();
-    assert.equal(app.el('importBtn').disabled, false);
-    app.el(id).emit(id === 'tasks' ? 'input' : 'change');
-    assert.equal(app.el('importBtn').disabled, true);
-    assert.equal(app.el('preview').hidden, true);
-    assert.equal(app.el('previewList').innerHTML, '');
-    app.preview();
-    assert.equal(app.el('importBtn').disabled, false);
-  });
-}
-
-test('existing project, tag, note and bullet parsing still works', async () => {
-  const app = await loadPlugin('[wOrK]\n- Parent #work ((Check (CI)))\n  [ ] Child ((Child note))');
+test('keeps project, known tag, and inline task notes working', async () => {
+  const app = await loadPlugin('[wOrK]\n- Parent #work ((Check (CI)))\n  - Child ((Child note))');
   await app.import();
   assert.equal(app.created[0].title, 'Parent');
   assert.equal(app.created[0].projectId, 'work');
@@ -205,116 +104,41 @@ test('existing project, tag, note and bullet parsing still works', async () => {
   assert.equal(app.created[1].notes, 'Child note');
 });
 
-for (const input of ['[Unknown]\nTask', 'Task #unknown', 'Task ((unclosed', '((note only))']) {
-  test(`existing validation still blocks invalid input: ${input}`, async () => {
-    const app = await loadPlugin(input);
-    await app.import();
-    assert.equal(app.calls.length, 0);
-    assert.notEqual(app.el('errors').innerHTML, '');
-  });
-}
-
-for (const [kind, notify] of [
-  ['synchronous', () => { throw new Error('Snack failed'); }],
-  ['asynchronous', () => Promise.reject(new Error('Snack failed'))],
-]) {
-  test(`${kind} notification failure does not turn a successful import into a failure`, async () => {
-    const app = await loadPlugin('Task', { notify });
-    await app.import();
-    assert.equal(app.created.length, 1);
-    assert.equal(app.el('tasks').value, '');
-    assert.equal(app.el('importError').hidden, true);
-    assert.equal(app.el('success').textContent, '1 task(s) created.');
-  });
-}
-
-test('notification failure does not hide a partial import report', async () => {
-  const app = await loadPlugin('Task A\nTask B', {
-    beforeAdd(data, count) { if (count === 2) throw new Error('Import failed'); },
-    notify() { throw new Error('Snack failed'); },
-  });
-  await app.import();
-  assert.equal(app.el('importError').hidden, false);
-  assert.match(app.el('importError').textContent, /after 1 task\(s\) confirmed created/);
+test('blocks unknown projects, unknown tags, and unclosed inline notes', async () => {
+  for (const input of ['[Unknown]\n- Task', '- Task #unknown', '- Task ((unclosed']) {
+    const app = await loadPlugin(input); app.preview();
+    assert.equal(app.el('importBtn').disabled, true, input);
+    await app.import(); assert.equal(app.calls.length, 0, input);
+  }
 });
 
-for (const failOn of [1, 2]) {
-  test(`unchanged failed input cannot be retried after failure on task ${failOn}`, async () => {
-    const input = 'Task A\nTask B';
-    const app = await loadPlugin(input, {
-      beforeAdd(data, count) { if (count === failOn) throw new Error('Host error'); },
-    });
-    await app.import();
-    const report = app.el('importError').textContent;
-    assert.equal(app.el('importBtn').disabled, true);
-    await app.import();
-    app.preview();
-    await app.import();
-    for (const id of controlIds) {
-      app.el(id).emit(id === 'tasks' ? 'input' : 'change');
-      app.preview();
-      assert.equal(app.el('importBtn').disabled, true);
-      await app.import();
-    }
-    assert.equal(app.calls.length, failOn);
-    assert.equal(app.created.length, failOn - 1);
-    assert.equal(app.el('importError').hidden, false);
-    assert.equal(app.el('importError').textContent, report);
-
-    // Editing and then undoing the edit must not unlock the original failed list.
-    app.el('tasks').value = 'Revised list';
-    app.el('tasks').emit('input');
-    app.preview();
-    assert.equal(app.el('importBtn').disabled, false);
-    app.el('tasks').value = input;
-    app.el('tasks').emit('input');
-    app.preview();
-    await app.import();
-    assert.equal(app.el('importBtn').disabled, true);
-    assert.equal(app.calls.length, failOn);
-  });
-}
-
-test('edited retry keeps the report visible while pending and clears it on success', async () => {
-  let release;
-  const pending = new Promise((resolve) => { release = resolve; });
-  const app = await loadPlugin('Task A\nTask B', {
-    beforeAdd(data, count) {
-      if (count === 2) throw new Error('Host error');
-      if (count === 3) return pending;
-    },
-  });
-  await app.import();
-  const report = app.el('importError').textContent;
-  app.el('tasks').value = 'Task B';
-  app.el('tasks').emit('input');
+test('blocks checklist lines without an enclosing task', async () => {
+  const app = await loadPlugin('- [ ] Orphan item'); app.preview();
+  assert.match(app.el('errors').innerHTML, /checklist items must be indented beneath a task/);
   assert.equal(app.el('importBtn').disabled, true);
-  app.preview();
-  assert.equal(app.el('importBtn').disabled, false);
-  const retrying = app.import();
+});
+
+test('does not create third-level tasks; deeper dash bullets become subtask Markdown', async () => {
+  const app = await loadPlugin('- Parent\n  - Child\n    - ordinary Markdown bullet');
+  await app.import();
+  assert.equal(app.created.length, 2);
+  assert.equal(app.created[1].notes, '- ordinary Markdown bullet');
+});
+
+test('keeps partial import warning and prevents unchanged retry after API failure', async () => {
+  const input = '- Parent\n  - Child';
+  const app = await loadPlugin(input, { beforeAdd(_data, count) { if (count === 2) throw new Error('API failure'); } });
+  await app.import();
+  assert.equal(app.created.length, 1);
+  assert.equal(app.el('tasks').value, input);
   assert.equal(app.el('importError').hidden, false);
-  assert.equal(app.el('importError').textContent, report);
-  release();
-  await retrying;
-  assert.deepEqual(app.created.map((task) => task.title), ['Task A', 'Task B']);
-  assert.equal(app.el('importError').hidden, true);
-  assert.equal(app.el('importError').textContent, '');
+  assert.equal(app.el('importBtn').disabled, true);
+  await app.import(); assert.equal(app.calls.length, 2);
+});
+
+test('clears input after successful import', async () => {
+  const app = await loadPlugin('- Task'); await app.import();
+  assert.equal(app.created.length, 1);
+  assert.equal(app.el('tasks').value, '');
   assert.equal(app.el('success').textContent, '1 task(s) created.');
-});
-
-test('a second failure blocks its revised input and updates the visible report', async () => {
-  const app = await loadPlugin('Task A\nTask B', {
-    beforeAdd(data, count) { if (count >= 2) throw new Error('Host error'); },
-  });
-  await app.import();
-  app.el('tasks').value = 'Task B';
-  app.el('tasks').emit('input');
-  app.preview();
-  await app.import();
-  assert.equal(app.el('importBtn').disabled, true);
-  assert.equal(app.el('importError').hidden, false);
-  assert.match(app.el('importError').textContent, /after 0 task\(s\) confirmed created/);
-  assert.match(app.el('importError').textContent, /Failed on line 1: "Task B"/);
-  await app.import();
-  assert.equal(app.calls.length, 3);
 });

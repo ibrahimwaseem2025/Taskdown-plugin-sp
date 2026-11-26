@@ -3,164 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bulk Add Tasks</title>
-  <!-- Bulk Add Tasks for Super Productivity v0.1.2. Author: initialcrow. -->
+  <title>Markdown Task Importer</title>
   <style>
-    /* The iframe receives Super Productivity theme variables from the host. */
     * { box-sizing: border-box; }
-
-    /* Local variables extend the host theme without imposing a separate palette. */
     :root {
       color-scheme: light dark;
-      --bulk-radius: 8px;
-      --bulk-gap: 20px;
-      --bulk-control-bg: color-mix(in srgb, var(--bg, transparent) 88%, var(--card-bg, transparent));
-      --bulk-soft-bg: color-mix(in srgb, var(--c-primary, #3f51b5) 8%, transparent);
-      --bulk-hover-bg: color-mix(in srgb, var(--c-primary, #3f51b5) 10%, transparent);
+      --radius: 8px;
+      --gap: 20px;
+      --control-bg: color-mix(in srgb, var(--bg, transparent) 88%, var(--card-bg, transparent));
+      --soft-bg: color-mix(in srgb, var(--c-primary, #3f51b5) 8%, transparent);
+      --hover-bg: color-mix(in srgb, var(--c-primary, #3f51b5) 10%, transparent);
     }
     body {
-      margin: 0;
-      padding: var(--s3, 24px);
-      color: var(--text-color, inherit);
+      margin: 0; padding: var(--s3, 24px); color: var(--text-color, inherit);
       background: var(--bg, transparent);
-      font-family: var(--font-primary-stack, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-      font-size: 15px;
-      line-height: 1.5;
+      font-family: var(--font-primary-stack, Inter, ui-sans-serif, system-ui, sans-serif);
+      font-size: 15px; line-height: 1.5;
     }
-
-    /* Main layout: large input area plus compact configuration panel. */
-    .wrap { max-width: 1040px; margin: 0 auto; }
-    h1 { margin: 0 0 6px; font-size: 1.55rem; line-height: 1.2; font-weight: 700; }
-    .subtitle { margin: 0 0 22px; color: var(--text-color-muted, currentColor); line-height: 1.5; max-width: 760px; }
-    .grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--bulk-gap); align-items: start; }
-    .card {
-      border: 1px solid var(--divider-color, rgba(127,127,127,.25));
-      border-radius: var(--bulk-radius);
-      background: var(--card-bg, transparent);
-      box-shadow: var(--whiteframe-shadow-1dp, none);
-      padding: 18px;
-    }
-
-    /* Native controls with clear focus styling that follows the host theme. */
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-size: 1.55rem; line-height: 1.2; }
+    .subtitle { margin: 0 0 22px; color: var(--text-color-muted, currentColor); max-width: 800px; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: var(--gap); align-items: start; }
+    .card { border: 1px solid var(--divider-color, rgba(127,127,127,.25)); border-radius: var(--radius); background: var(--card-bg, transparent); padding: 18px; }
     label { display: block; font-weight: 650; margin-bottom: 7px; }
-    textarea, select, input[type="text"] {
-      width: 100%;
-      color: inherit;
-      background: var(--bulk-control-bg);
-      border: 1px solid var(--extra-border-color, rgba(127,127,127,.45));
-      border-radius: var(--bulk-radius);
-      padding: 10px 11px;
-      font: inherit;
-      transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
-    }
-    textarea:focus, select:focus, input[type="text"]:focus {
-      border-color: var(--c-primary, #3f51b5);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary, #3f51b5) 18%, transparent);
-      outline: none;
-    }
-    textarea {
-      min-height: 420px;
-      resize: vertical;
-      line-height: 1.45;
-      font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-      font-size: .94rem;
-      tab-size: 2;
-    }
-
-    /* Side options: short helper text and aligned checkbox labels. */
-    select[multiple] { min-height: 145px; }
+    textarea, select { width: 100%; color: inherit; background: var(--control-bg); border: 1px solid var(--extra-border-color, rgba(127,127,127,.45)); border-radius: var(--radius); padding: 10px 11px; font: inherit; }
+    textarea:focus, select:focus { border-color: var(--c-primary, #3f51b5); outline: 2px solid color-mix(in srgb, var(--c-primary, #3f51b5) 25%, transparent); }
+    textarea { min-height: 440px; resize: vertical; line-height: 1.45; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .92rem; tab-size: 2; }
+    select[multiple] { min-height: 135px; }
     .field { margin-bottom: 16px; }
-    .hint { margin-top: 6px; font-size: .86rem; color: var(--text-color-muted, currentColor); line-height: 1.4; }
+    .hint { margin-top: 6px; color: var(--text-color-muted, currentColor); font-size: .86rem; line-height: 1.4; }
     .checks { display: grid; gap: 9px; }
     .check { display: flex; align-items: flex-start; gap: 8px; font-weight: 400; }
     .check input { margin-top: 4px; accent-color: var(--c-primary, #3f51b5); }
     .actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
-    button {
-      border: 1px solid var(--extra-border-color, rgba(127,127,127,.45));
-      background: var(--bulk-control-bg);
-      color: inherit;
-      border-radius: var(--bulk-radius);
-      padding: 9px 15px;
-      font: inherit;
-      font-weight: 650;
-      cursor: pointer;
-      transition: transform .12s ease, border-color .12s ease, background .12s ease, opacity .12s ease;
-    }
-
-    /* The primary action uses Super Productivity's primary color. */
-    button:hover:not(:disabled) {
-      background: var(--bulk-hover-bg);
-      border-color: var(--c-primary, #3f51b5);
-      transform: translateY(-1px);
-    }
-    button.primary {
-      background: var(--c-primary, #3f51b5);
-      color: var(--text-color-most-intense, #fff);
-      border-color: transparent;
-    }
-    button.primary:hover:not(:disabled) { filter: brightness(1.04); }
+    button { border: 1px solid var(--extra-border-color, rgba(127,127,127,.45)); background: var(--control-bg); color: inherit; border-radius: var(--radius); padding: 9px 15px; font: inherit; font-weight: 650; cursor: pointer; }
+    button:hover:not(:disabled) { background: var(--hover-bg); border-color: var(--c-primary, #3f51b5); }
+    button.primary { background: var(--c-primary, #3f51b5); color: var(--text-color-most-intense, #fff); border-color: transparent; }
     button:disabled { opacity: .45; cursor: default; }
-    .summary { font-size: .92rem; color: var(--text-color-muted, currentColor); }
-
-    /* Dense preview for quickly checking project, tags, notes, and hierarchy before import. */
-    .preview {
-      margin-top: 20px;
-      border-top: 1px solid var(--divider-color, rgba(127,127,127,.25));
-      padding-top: 16px;
-    }
+    .summary { color: var(--text-color-muted, currentColor); font-size: .92rem; }
+    .success { margin-left: auto; color: var(--c-primary, currentColor); font-size: .92rem; }
+    .preview { margin-top: 20px; border-top: 1px solid var(--divider-color, rgba(127,127,127,.25)); padding-top: 16px; }
     .preview h2 { margin: 0 0 10px; font-size: 1.05rem; }
-    .preview-list { display: grid; gap: 4px; max-height: 300px; overflow: auto; padding-right: 2px; }
-    .preview-row { padding: 6px 8px; border-radius: 6px; }
-    .preview-row:hover { background: var(--bulk-soft-bg); }
+    .preview-list { display: grid; gap: 8px; max-height: 520px; overflow: auto; }
+    .preview-row { padding: 8px; border-radius: 6px; background: var(--soft-bg); }
+    .preview-title { font-weight: 650; }
     .meta { color: var(--text-color-muted, currentColor); font-size: .82rem; margin-left: 8px; }
-    .note-preview {
-      margin-top: 3px;
-      color: var(--text-color-muted, currentColor);
-      font-size: .84rem;
-      white-space: pre-wrap;
-    }
-    .error-box {
-      border: 1px solid var(--c-warn, #ef6c00);
-      border-radius: var(--bulk-radius);
-      background: color-mix(in srgb, var(--c-warn, #ef6c00) 9%, transparent);
-      padding: 10px 12px;
-      margin-top: 12px;
-      line-height: 1.4;
-    }
-
-    /* Small status labels and monospace fragments used in examples. */
-    .success { margin-left: auto; font-size: .92rem; color: var(--c-primary, currentColor); }
-    code {
-      border-radius: 4px;
-      background: var(--bulk-soft-bg);
-      padding: 1px 4px;
-      font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-      font-size: .9em;
-    }
-
-    /* Mobile layout: the side panel moves below the task input. */
-    @media (max-width: 760px) {
-      body { padding: 14px; }
-      .grid { grid-template-columns: 1fr; }
-      textarea { min-height: 300px; }
-    }
+    .note-preview { margin: 6px 0 0; padding: 8px 10px; border-left: 2px solid var(--divider-color, rgba(127,127,127,.35)); color: var(--text-color-muted, currentColor); font-size: .86rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .error-box { border: 1px solid var(--c-warn, #ef6c00); border-radius: var(--radius); background: color-mix(in srgb, var(--c-warn, #ef6c00) 9%, transparent); padding: 10px 12px; margin-top: 12px; line-height: 1.4; }
+    code { border-radius: 4px; background: var(--soft-bg); padding: 1px 4px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; }
+    @media (max-width: 760px) { body { padding: 14px; } .grid { grid-template-columns: 1fr; } textarea { min-height: 320px; } }
   </style>
 </head>
 <body>
-  <!-- User-facing text stays in English for broad compatibility. -->
   <main class="wrap">
-    <h1>Bulk Add Tasks</h1>
-    <p class="subtitle">
-      Paste one task per line. Optional <code>[Project name]</code> headings switch project,
-      indentation creates subtasks, existing <code>#tags</code> can be parsed from task titles,
-      and <code>((notes))</code> are added to the created task.
-    </p>
-
+    <h1>Markdown Task Importer</h1>
+    <p class="subtitle">Create tasks and subtasks from an indented Markdown outline. Add Markdown notes and grouped checklists to each task before importing.</p>
     <div class="grid">
-      <!-- Main task input, preview, and import action. -->
       <section class="card">
-        <label for="tasks">Tasks</label>
-        <textarea id="tasks" spellcheck="false" placeholder="Example:\n\nPrepare release ((Check CI before publishing))\n  Run tests\n  Update changelog\n\n[Personal]\nBuy coffee #errands\nCall dentist ((Ask for next appointment))"></textarea>
+        <label for="tasks">Task outline</label>
+        <textarea id="tasks" spellcheck="false" placeholder="- Prepare assignment\n  - Research\n    Notes go here. Markdown is supported.\n    **Critical**\n    - [ ] Find academic sources\n    - [x] Review literature\n    **Technical**\n    - [ ] Set up Zotero\n  - Write report\n    **Critical**\n    - [ ] Draft introduction"></textarea>
         <div class="actions">
           <button id="previewBtn">Preview</button>
           <button id="importBtn" class="primary" disabled>Create tasks</button>
@@ -169,496 +70,280 @@
         </div>
         <div id="errors"></div>
         <div id="importError" class="error-box" role="alert" hidden></div>
-        <div id="preview" class="preview" hidden>
-          <h2>Preview</h2>
-          <div id="previewList" class="preview-list"></div>
-        </div>
+        <div id="preview" class="preview" hidden><h2>Preview</h2><div id="previewList" class="preview-list"></div></div>
       </section>
-
-      <!-- Configuration panel for default project/tags and parser options. -->
       <aside class="card">
-        <div class="field">
-          <label for="project">Default project</label>
-          <select id="project"></select>
-          <div class="hint">Used until a <code>[Project name]</code> heading changes it.</div>
-        </div>
-
-        <div class="field">
-          <label for="tags">Default tags</label>
-          <select id="tags" multiple></select>
-          <div class="hint">Ctrl/Cmd-click to select several tags.</div>
-        </div>
-
+        <div class="field"><label for="project">Default project</label><select id="project"></select><div class="hint">A <code>[Project name]</code> line switches to an existing project.</div></div>
+        <div class="field"><label for="tags">Default tags</label><select id="tags" multiple></select><div class="hint">Ctrl/Cmd-click to select several tags.</div></div>
         <div class="field checks">
-          <label class="check">
-            <input id="parseTags" type="checkbox" checked />
-            <span>Parse existing <code>#tags</code> and remove them from titles</span>
-          </label>
-          <label class="check">
-            <input id="parseNotes" type="checkbox" checked />
-            <span>Parse <code>((notes))</code> and remove them from titles</span>
-          </label>
-          <label class="check">
-            <input id="stripBullets" type="checkbox" checked />
-            <span>Strip common bullets (<code>-</code>, <code>*</code>, <code>•</code>, <code>[ ]</code>)</span>
-          </label>
+          <label class="check"><input id="parseTags" type="checkbox" checked /><span>Parse existing <code>#tags</code> from task titles</span></label>
+          <label class="check"><input id="parseNotes" type="checkbox" checked /><span>Parse inline <code>((notes))</code> from task titles</span></label>
         </div>
-
         <div class="hint">
-          Indentation is relative. Only two levels are supported: tasks and their subtasks.
-          A subtask cannot have its own subtasks.
-          Project headings are matched case-insensitively against existing projects.
+          Use <code>- Task</code> for tasks and indented <code>- Subtask</code> for subtasks. Indented <code>- [ ]</code> and <code>- [x]</code> lines become checklist items. A standalone <code>**Category**</code> line labels the following checklist group. Other indented lines become Markdown notes for the current task. Only one subtask level is supported.
         </div>
       </aside>
     </div>
   </main>
-
   <script>
     (() => {
-      // Local DOM shortcut to avoid repeating document.getElementById.
+      'use strict';
       const $ = (id) => document.getElementById(id);
-
-      // Super Productivity injects window.PluginAPI into the iframe.
-      // Read it lazily because injection can happen shortly after this script starts.
       let plugin = null;
-
-      // Minimal local state. Super Productivity remains the source of truth.
-      const state = {
-        projects: [],
-        tags: [],
-        parsed: [],
-        errors: [],
-        isImporting: false,
-        failedInput: null,
-      };
-
-      // Cache interactive elements once so handlers stay focused on behavior.
+      const state = { projects: [], tags: [], parsed: [], errors: [], isImporting: false, failedInput: null };
       const els = {
-        tasks: $('tasks'),
-        project: $('project'),
-        tags: $('tags'),
-        parseTags: $('parseTags'),
-        parseNotes: $('parseNotes'),
-        stripBullets: $('stripBullets'),
-        previewBtn: $('previewBtn'),
-        importBtn: $('importBtn'),
-        summary: $('summary'),
-        success: $('success'),
-        errors: $('errors'),
-        importError: $('importError'),
-        preview: $('preview'),
-        previewList: $('previewList'),
+        tasks: $('tasks'), project: $('project'), tags: $('tags'), parseTags: $('parseTags'), parseNotes: $('parseNotes'),
+        previewBtn: $('previewBtn'), importBtn: $('importBtn'), summary: $('summary'), success: $('success'),
+        errors: $('errors'), importError: $('importError'), preview: $('preview'), previewList: $('previewList'),
       };
+      const inputControls = [els.tasks, els.project, els.tags, els.parseTags, els.parseNotes];
 
-      const inputControls = [
-        els.tasks, els.project, els.tags,
-        els.parseTags, els.parseNotes, els.stripBullets,
-      ];
-
-      // Escape values before HTML insertion so pasted content never becomes active markup.
       function escapeHtml(value) {
-        return String(value)
-          .replaceAll('&', '&amp;')
-          .replaceAll('<', '&lt;')
-          .replaceAll('>', '&gt;')
-          .replaceAll('"', '&quot;')
-          .replaceAll("'", '&#039;');
+        return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
       }
-
-      // Always read the API from globalThis to avoid keeping an early undefined value.
-      function getPluginApi() {
-        return globalThis.PluginAPI;
-      }
-
-      // Show the API error only after waiting for the iframe bridge injection.
+      function getPluginApi() { return globalThis.PluginAPI; }
       function showApiUnavailableError() {
         els.errors.innerHTML = '<div class="error-box">PluginAPI is unavailable. Reload this plugin from Super Productivity and check that it is installed as an iframe plugin.</div>';
-        els.previewBtn.disabled = true;
-        els.importBtn.disabled = true;
+        els.previewBtn.disabled = true; els.importBtn.disabled = true;
       }
-
-      // Wait for the documented window.PluginAPI object used by iframe plugins.
       function waitForPluginApi(timeoutMs = 5000) {
         return new Promise((resolve) => {
-          const startedAt = Date.now();
+          const started = Date.now();
           const check = () => {
             const api = getPluginApi();
-            if (api) {
-              resolve(api);
-              return;
-            }
-            if (Date.now() - startedAt >= timeoutMs) {
-              resolve(null);
-              return;
-            }
+            if (api) return resolve(api);
+            if (Date.now() - started >= timeoutMs) return resolve(null);
             window.setTimeout(check, 50);
           };
           check();
         });
       }
-
-      // Normalize names for case-insensitive project and tag matching.
-      function normalizeName(value) {
-        return value.trim().toLocaleLowerCase();
-      }
-
-      // Read selected default tags from the multiple select as tag ids.
-      function selectedDefaultTagIds() {
-        return Array.from(els.tags.selectedOptions).map((opt) => opt.value);
-      }
-
-      // Convert leading indentation to a comparable width; one tab counts as two spaces.
+      function normalizeName(value) { return value.trim().toLocaleLowerCase(); }
+      function selectedDefaultTagIds() { return Array.from(els.tags.selectedOptions).map((opt) => opt.value); }
       function indentWidth(raw) {
         let width = 0;
-        for (const ch of raw) {
-          if (ch === ' ') width += 1;
-          else if (ch === '\t') width += 2;
-          else break;
-        }
+        for (const ch of raw) { if (ch === ' ') width += 1; else if (ch === '\t') width += 2; else break; }
         return width;
       }
-
-      // Remove common bullet markers when enabled, without changing ordinary titles.
-      function stripBullet(title) {
-        if (!els.stripBullets.checked) return title;
-        return title
-          .replace(/^[-*•]\s+/, '')
-          .replace(/^\[(?: |x|X)\]\s+/, '');
-      }
-
-      // Find a note end while tolerating a final parenthesis in the note content:
-      // `((see (ok)))` becomes the note `see (ok)`, without leaving `)` in the title.
       function findNoteEnd(value, fromIndex) {
         let end = value.indexOf('))', fromIndex);
-        while (end !== -1 && value[end + 2] === ')') {
-          end = value.indexOf('))', end + 1);
-        }
+        while (end !== -1 && value[end + 2] === ')') end = value.indexOf('))', end + 1);
         return end;
       }
-
-      // Extract ((note)) blocks and remove them from the title sent to Super Productivity.
       function parseNotesFromTitle(title) {
-        if (!els.parseNotes.checked) {
-          return { title, notes: '', errors: [] };
-        }
-
-        const notes = [];
-        const titleParts = [];
-        const errors = [];
-        let cursor = 0;
-
+        if (!els.parseNotes.checked) return { title, notes: '', errors: [] };
+        const notes = []; const parts = []; const errors = []; let cursor = 0;
         while (cursor < title.length) {
           const start = title.indexOf('((', cursor);
-          if (start === -1) {
-            titleParts.push(title.slice(cursor));
-            break;
-          }
-
-          titleParts.push(title.slice(cursor, start));
+          if (start === -1) { parts.push(title.slice(cursor)); break; }
+          parts.push(title.slice(cursor, start));
           const end = findNoteEnd(title, start + 2);
-          if (end === -1) {
-            titleParts.push(title.slice(start));
-            errors.push('note marker is not closed; use ((note)).');
-            break;
-          }
-
-          const note = title.slice(start + 2, end).trim();
-          if (note) notes.push(note);
-          titleParts.push(' ');
-          cursor = end + 2;
+          if (end === -1) { parts.push(title.slice(start)); errors.push('note marker is not closed; use ((note)).'); break; }
+          const note = title.slice(start + 2, end).trim(); if (note) notes.push(note);
+          parts.push(' '); cursor = end + 2;
         }
-
-        const cleaned = titleParts.join('').replace(/\s{2,}/g, ' ').trim();
-
-        return {
-          title: cleaned,
-          notes: notes.join('\n\n'),
-          errors,
-        };
+        return { title: parts.join('').replace(/\s{2,}/g, ' ').trim(), notes: notes.join('\n\n'), errors };
       }
-
-      // Extract #tags from titles only when they match existing Super Productivity tags.
       function parseTagsFromTitle(title, defaultTagIds) {
-        if (!els.parseTags.checked) {
-          return { title, tagIds: [...defaultTagIds], unknownTags: [] };
-        }
-
-        const knownByName = new Map(state.tags.map((tag) => [normalizeName(tag.title), tag]));
-        const found = [];
-        const unknown = [];
-
-        // Unknown tags stay in the title to avoid silent data loss.
+        if (!els.parseTags.checked) return { title, tagIds: [...defaultTagIds], unknownTags: [] };
+        const known = new Map(state.tags.map((tag) => [normalizeName(tag.title), tag]));
+        const found = []; const unknown = [];
         const cleaned = title.replace(/(^|\s)#([^\s#]+)/g, (full, lead, rawName) => {
-          const decoded = rawName.replace(/[.,;:!?]+$/, '');
-          const tag = knownByName.get(normalizeName(decoded));
-          if (!tag) {
-            unknown.push(decoded);
-            return full;
-          }
-          found.push(tag.id);
-          const trailing = rawName.slice(decoded.length);
-          return lead + trailing;
+          const decoded = rawName.replace(/[.,;:!?]+$/, ''); const tag = known.get(normalizeName(decoded));
+          if (!tag) { unknown.push(decoded); return full; }
+          found.push(tag.id); return lead + rawName.slice(decoded.length);
         }).replace(/\s{2,}/g, ' ').trim();
-
-        return {
-          title: cleaned,
-          tagIds: [...new Set([...defaultTagIds, ...found])],
-          unknownTags: unknown,
+        return { title: cleaned, tagIds: [...new Set([...defaultTagIds, ...found])], unknownTags: unknown };
+      }
+      function appendMarkdown(row, line) {
+        if (row.notes) row.notes += '\n';
+        row.notes += line;
+      }
+      function addTaskRow(titleText, indent, lineNumber, parentIndex, projectId, defaultTagIds, rows, errors) {
+        const noteResult = parseNotesFromTitle(titleText);
+        const tagResult = parseTagsFromTitle(noteResult.title, defaultTagIds);
+        if (noteResult.errors.length) errors.push(`Line ${lineNumber}: ${noteResult.errors.join(' ')}`);
+        if (tagResult.unknownTags.length) errors.push(`Line ${lineNumber}: unknown tag(s): ${tagResult.unknownTags.map((tag) => `#${tag}`).join(', ')}.`);
+        if (!tagResult.title) { errors.push(`Line ${lineNumber}: task title is empty after parsing.`); return null; }
+        const parent = parentIndex === null ? null : rows[parentIndex];
+        const row = {
+          line: lineNumber, title: tagResult.title, indent, depth: parent ? 1 : 0, parentIndex,
+          projectId, tagIds: tagResult.tagIds, notes: noteResult.notes, category: null,
         };
+        rows.push(row);
+        return rows.length - 1;
       }
 
-      // Convert pasted text into importable rows with project, tags, notes, and parent links.
+      // Parse into task records first; each record owns its own notes/checklist Markdown.
       function parseInput() {
         const projectByName = new Map(state.projects.map((p) => [normalizeName(p.title), p]));
         let currentProjectId = els.project.value || null;
         const defaultTagIds = selectedDefaultTagIds();
-        const rows = [];
-        const errors = [];
-        const parentStack = [];
-        const lines = els.tasks.value.replace(/\r/g, '').split('\n');
+        const rows = []; const errors = [];
+        let rootIndex = null; let currentIndex = null; let rootIndent = null;
+        const lines = els.tasks.value.replace(/\r\n?/g, '\n').split('\n');
 
         lines.forEach((raw, index) => {
-          // Empty lines only separate pasted content visually.
           if (!raw.trim()) return;
-          const trimmed = raw.trim();
-          const heading = trimmed.match(/^\[([^\]]+)\]$/);
+          const lineNumber = index + 1; const indent = indentWidth(raw); const trimmed = raw.trim();
+          const projectHeading = trimmed.match(/^\[([^\]]+)\]$/);
+          if (projectHeading) {
+            const name = projectHeading[1].trim(); const project = projectByName.get(normalizeName(name));
+            if (!project) errors.push(`Line ${lineNumber}: unknown project "${name}".`);
+            else currentProjectId = project.id;
+            rootIndex = null; currentIndex = null; rootIndent = null;
+            return;
+          }
 
-          // A [Project name] heading changes the current project and resets the parent stack.
-          if (heading) {
-            const projectName = heading[1].trim();
-            const project = projectByName.get(normalizeName(projectName));
-            if (!project) {
-              errors.push(`Line ${index + 1}: unknown project "${projectName}".`);
-            } else {
-              currentProjectId = project.id;
-              parentStack.length = 0;
+          // Checkbox syntax must be detected before task bullets or ordinary Markdown.
+          const checklist = trimmed.match(/^-\s+\[([ xX])\]\s+(.+)$/);
+          if (checklist) {
+            if (currentIndex === null || indent <= rows[currentIndex].indent) {
+              errors.push(`Line ${lineNumber}: checklist items must be indented beneath a task or subtask.`);
+              return;
+            }
+            const row = rows[currentIndex];
+            const itemResult = parseNotesFromTitle(checklist[2].trim());
+            if (itemResult.errors.length) errors.push(`Line ${lineNumber}: ${itemResult.errors.join(' ')}`);
+            if (!row.category) { row.category = 'Checklist'; appendMarkdown(row, '**Checklist**'); }
+            if (itemResult.title) appendMarkdown(row, `- [${checklist[1].toLowerCase() === 'x' ? 'x' : ' '}] ${itemResult.title}`);
+            if (itemResult.notes) appendMarkdown(row, itemResult.notes);
+            return;
+          }
+
+          const category = trimmed.match(/^\*\*(.+?)\*\*$/);
+          if (category && currentIndex !== null && indent > rows[currentIndex].indent) {
+            const name = category[1].trim();
+            if (!name) { errors.push(`Line ${lineNumber}: checklist category cannot be empty.`); return; }
+            rows[currentIndex].category = name;
+            appendMarkdown(rows[currentIndex], `**${name}**`);
+            return;
+          }
+
+          const taskBullet = trimmed.match(/^-\s+(.+)$/);
+          if (taskBullet) {
+            let parentIndex = null; let isRoot = false;
+            if (rootIndex === null || indent <= rootIndent) isRoot = true;
+            else if (currentIndex !== null && rows[currentIndex].depth === 0 && indent > rootIndent) parentIndex = rootIndex;
+            else if (currentIndex !== null && rows[currentIndex].depth === 1 && indent <= rows[currentIndex].indent) parentIndex = rootIndex;
+            else if (currentIndex !== null && rows[currentIndex].depth === 1 && indent > rows[currentIndex].indent) {
+              // Deeper ordinary Markdown bullets belong to the subtask's notes, not a third task level.
+              appendMarkdown(rows[currentIndex], trimmed);
+              return;
+            }
+            if (isRoot) {
+              const newIndex = addTaskRow(taskBullet[1].trim(), indent, lineNumber, null, currentProjectId, defaultTagIds, rows, errors);
+              if (newIndex !== null) { rootIndex = newIndex; currentIndex = newIndex; rootIndent = indent; }
+            } else if (parentIndex !== null) {
+              const newIndex = addTaskRow(taskBullet[1].trim(), indent, lineNumber, parentIndex, currentProjectId, defaultTagIds, rows, errors);
+              if (newIndex !== null) currentIndex = newIndex;
             }
             return;
           }
 
-          // More-indented tasks become children of the nearest preceding task.
-          const indent = indentWidth(raw);
-          let title = stripBullet(trimmed).trim();
-          if (!title) return;
-
-          const noteResult = parseNotesFromTitle(title);
-          title = noteResult.title;
-
-          const tagResult = parseTagsFromTitle(title, defaultTagIds);
-          title = tagResult.title;
-
-          if (noteResult.errors.length) {
-            errors.push(`Line ${index + 1}: ${noteResult.errors.join(' ')}`);
-          }
-          if (tagResult.unknownTags.length) {
-            errors.push(`Line ${index + 1}: unknown tag(s): ${tagResult.unknownTags.map((t) => `#${t}`).join(', ')}.`);
-          }
-          if (!title) {
-            errors.push(`Line ${index + 1}: task title is empty after parsing.`);
+          // Unindented plain lines remain accepted as legacy top-level task titles.
+          if (indent === 0 && currentIndex === null) {
+            const newIndex = addTaskRow(trimmed, indent, lineNumber, null, currentProjectId, defaultTagIds, rows, errors);
+            if (newIndex !== null) { rootIndex = newIndex; currentIndex = newIndex; rootIndent = indent; }
             return;
           }
 
-          // Pop back to the nearest strictly shallower indentation level.
-          while (parentStack.length && parentStack.at(-1).indent >= indent) {
-            parentStack.pop();
-          }
-          const parentIndex = parentStack.at(-1)?.rowIndex ?? null;
-          const depth = parentIndex === null ? 0 : rows[parentIndex].depth + 1;
-          if (depth > 1) {
-            errors.push(`Line ${index + 1}: subtasks cannot have subtasks. Reduce indentation to keep only two levels: tasks and subtasks.`);
+          // Non-structural indented lines are Markdown notes for the active task.
+          if (currentIndex !== null && indent > rows[currentIndex].indent) {
+            appendMarkdown(rows[currentIndex], trimmed);
+            return;
           }
 
-          const row = {
-            line: index + 1,
-            title,
-            indent,
-            depth,
-            parentIndex,
-            projectId: currentProjectId,
-            tagIds: tagResult.tagIds,
-            notes: noteResult.notes,
-          };
-          rows.push(row);
-          parentStack.push({ indent, rowIndex: rows.length - 1 });
+          // A new unindented line is a legacy top-level task.
+          if (indent === 0) {
+            const newIndex = addTaskRow(trimmed, indent, lineNumber, null, currentProjectId, defaultTagIds, rows, errors);
+            if (newIndex !== null) { rootIndex = newIndex; currentIndex = newIndex; rootIndent = indent; }
+            return;
+          }
+          errors.push(`Line ${lineNumber}: could not associate this line with a task. Indent notes/checklists beneath their task.`);
         });
-
         return { rows, errors };
       }
 
-      // Resolve the project label displayed in the preview from the stored id.
       function projectTitle(id) {
         if (!id) return 'No project';
         return state.projects.find((p) => p.id === id)?.title || 'Unknown project';
       }
-
-      // An unchanged failed list must not be submitted again, even after another preview.
-      function isRetryBlocked() {
-        return state.failedInput !== null && els.tasks.value === state.failedInput;
-      }
-
-      // Rebuild the preview and keep the import button state in sync.
+      function isRetryBlocked() { return state.failedInput !== null && els.tasks.value === state.failedInput; }
       function renderPreview() {
         if (state.isImporting) return;
-        const parsed = parseInput();
-        state.parsed = parsed.rows;
-        state.errors = parsed.errors;
-
+        const parsed = parseInput(); state.parsed = parsed.rows; state.errors = parsed.errors;
         els.previewList.innerHTML = parsed.rows.map((row) => {
-          const tagTitles = row.tagIds
-            .map((id) => state.tags.find((t) => t.id === id)?.title)
-            .filter(Boolean);
-          const meta = [projectTitle(row.projectId), tagTitles.length ? tagTitles.map((t) => `#${t}`).join(' ') : '']
-            .filter(Boolean)
-            .join(' · ');
+          const tags = row.tagIds.map((id) => state.tags.find((tag) => tag.id === id)?.title).filter(Boolean);
+          const meta = [projectTitle(row.projectId), tags.length ? tags.map((tag) => `#${tag}`).join(' ') : ''].filter(Boolean).join(' · ');
           const note = row.notes ? `<div class="note-preview">${escapeHtml(row.notes)}</div>` : '';
-          return `<div class="preview-row" style="padding-left:${7 + row.depth * 20}px">${escapeHtml(row.title)}<span class="meta">${escapeHtml(meta)}</span>${note}</div>`;
+          return `<div class="preview-row" style="margin-left:${row.depth * 22}px"><div><span class="preview-title">${escapeHtml(row.title)}</span><span class="meta">${escapeHtml(meta)}</span></div>${note}</div>`;
         }).join('');
-
         els.preview.hidden = parsed.rows.length === 0;
         els.summary.textContent = parsed.rows.length ? `${parsed.rows.length} task(s)` : '';
-        els.errors.innerHTML = parsed.errors.length
-          ? `<div class="error-box"><strong>Fix before importing:</strong><br>${parsed.errors.map(escapeHtml).join('<br>')}</div>`
-          : '';
+        els.errors.innerHTML = parsed.errors.length ? `<div class="error-box"><strong>Fix before importing:</strong><br>${parsed.errors.map(escapeHtml).join('<br>')}</div>` : '';
         els.importBtn.disabled = parsed.rows.length === 0 || parsed.errors.length > 0 || isRetryBlocked();
       }
-
-      // Notifications are supplementary; their failure must not change the import result.
       async function showImportNotification(msg, type) {
-        try {
-          await plugin.showSnack({ msg, type });
-        } catch (error) {
-          console.error('[Bulk Add Tasks] Notification failed', error);
-        }
+        try { await plugin.showSnack({ msg, type }); }
+        catch (error) { console.error('[Markdown Task Importer] Notification failed', error); }
       }
-
-      // Create tasks in order so child rows can reuse the id of their newly-created parent.
       async function importTasks() {
         if (state.isImporting || isRetryBlocked()) return;
         plugin = getPluginApi();
-        if (!plugin) {
-          showApiUnavailableError();
-          return;
-        }
-
+        if (!plugin) { showApiUnavailableError(); return; }
         renderPreview();
         if (state.errors.length || !state.parsed.length) return;
-
-        // Keep this import tied to the validated input until every request has settled.
-        const rows = state.parsed;
-        const input = els.tasks.value;
-        state.isImporting = true;
-        inputControls.forEach((control) => { control.disabled = true; });
-        els.importBtn.disabled = true;
-        els.previewBtn.disabled = true;
-        els.success.textContent = 'Creating…';
-
+        const rows = state.parsed; const input = els.tasks.value;
+        state.isImporting = true; inputControls.forEach((control) => { control.disabled = true; });
+        els.importBtn.disabled = true; els.previewBtn.disabled = true; els.success.textContent = 'Creating…';
         const createdIds = [];
         try {
           for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            const parentId = row.parentIndex === null ? null : createdIds[row.parentIndex];
-            const id = await plugin.addTask({
-              title: row.title,
-              projectId: row.projectId,
-              tagIds: row.tagIds,
-              parentId,
-              notes: row.notes,
-            });
-            createdIds.push(id);
-            els.success.textContent = `Creating ${i + 1}/${rows.length}…`;
+            const row = rows[i]; const parentId = row.parentIndex === null ? null : createdIds[row.parentIndex];
+            const id = await plugin.addTask({ title: row.title, projectId: row.projectId, tagIds: row.tagIds, parentId, notes: row.notes });
+            createdIds.push(id); els.success.textContent = `Creating ${i + 1}/${rows.length}…`;
           }
-
           els.success.textContent = `${createdIds.length} task(s) created.`;
-          els.tasks.value = '';
-          state.failedInput = null;
-          els.importError.hidden = true;
-          els.importError.textContent = '';
+          els.tasks.value = ''; state.failedInput = null; els.importError.hidden = true; els.importError.textContent = '';
         } catch (error) {
-          console.error('[Bulk Add Tasks] Import failed', error);
-          state.failedInput = input;
+          console.error('[Markdown Task Importer] Import failed', error); state.failedInput = input;
           const failedRow = rows[createdIds.length];
-          els.importError.textContent = `Import stopped after ${createdIds.length} task(s) confirmed created. Failed on line ${failedRow.line}: "${failedRow.title}". Your text has been kept. Check the tasks already present in Super Productivity, then edit your task list and preview it again before retrying. Importing tasks already created can cause duplicates. Check the developer console for error details.`;
-          els.importError.hidden = false;
-          els.success.textContent = '';
+          els.importError.textContent = `Import stopped after ${createdIds.length} task(s) confirmed created. Failed on line ${failedRow.line}: "${failedRow.title}". Your text has been kept. Check tasks already present in Super Productivity, then edit your list and preview before retrying. Importing tasks already created can cause duplicates. Check the developer console for details.`;
+          els.importError.hidden = false; els.success.textContent = '';
         } finally {
-          state.isImporting = false;
-          inputControls.forEach((control) => { control.disabled = false; });
-          els.previewBtn.disabled = false;
-          renderPreview();
+          state.isImporting = false; inputControls.forEach((control) => { control.disabled = false; });
+          els.previewBtn.disabled = false; renderPreview();
         }
-
         const completed = createdIds.length === rows.length;
-        await showImportNotification(
-          completed ? `${createdIds.length} task(s) created` : `Import stopped after ${createdIds.length} task(s).`,
-          completed ? 'SUCCESS' : 'ERROR',
-        );
+        await showImportNotification(completed ? `${createdIds.length} task(s) created` : `Import stopped after ${createdIds.length} task(s).`, completed ? 'SUCCESS' : 'ERROR');
       }
-
-      // Load existing projects and tags through the official iframe Plugin API.
       async function init() {
         plugin = getPluginApi();
-        if (!plugin) {
-          showApiUnavailableError();
-          return;
-        }
-
+        if (!plugin) { showApiUnavailableError(); return; }
         try {
-          [state.projects, state.tags] = await Promise.all([
-            plugin.getAllProjects(),
-            plugin.getAllTags(),
-          ]);
-
-          // The empty option creates tasks without an explicit project.
-          const projectOptions = [
-            '<option value="">No project</option>',
-            ...state.projects
-              .toSorted((a, b) => a.title.localeCompare(b.title))
-              .map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.title)}</option>`),
-          ];
-          els.project.innerHTML = projectOptions.join('');
-
-          // Tags are limited to existing tags to avoid accidental label creation.
-          els.tags.innerHTML = state.tags
-            .toSorted((a, b) => a.title.localeCompare(b.title))
-            .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.title)}</option>`)
-            .join('');
+          [state.projects, state.tags] = await Promise.all([plugin.getAllProjects(), plugin.getAllTags()]);
+          els.project.innerHTML = ['<option value="">No project</option>', ...state.projects.toSorted((a, b) => a.title.localeCompare(b.title)).map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.title)}</option>`)].join('');
+          els.tags.innerHTML = state.tags.toSorted((a, b) => a.title.localeCompare(b.title)).map((tag) => `<option value="${escapeHtml(tag.id)}">${escapeHtml(tag.title)}</option>`).join('');
         } catch (error) {
-          console.error('[Bulk Add Tasks] Init failed', error);
+          console.error('[Markdown Task Importer] Init failed', error);
           els.errors.innerHTML = '<div class="error-box">Could not load projects/tags from Super Productivity.</div>';
           els.previewBtn.disabled = true;
         }
       }
-
-      // A changed input or option requires a fresh preview before importing.
       function invalidatePreview() {
         if (state.isImporting) return;
-        state.parsed = [];
-        state.errors = [];
-        els.preview.hidden = true;
-        els.previewList.innerHTML = '';
-        els.summary.textContent = '';
-        els.errors.innerHTML = '';
-        els.importBtn.disabled = true;
-        els.success.textContent = '';
-        // Keep a partial import warning visible while the user corrects the input.
+        state.parsed = []; state.errors = []; els.preview.hidden = true; els.previewList.innerHTML = '';
+        els.summary.textContent = ''; els.errors.innerHTML = ''; els.importBtn.disabled = true; els.success.textContent = '';
       }
-
       els.previewBtn.addEventListener('click', renderPreview);
       els.importBtn.addEventListener('click', importTasks);
       els.tasks.addEventListener('input', invalidatePreview);
-      inputControls.filter((control) => control !== els.tasks).forEach((control) => {
-        control.addEventListener('change', invalidatePreview);
-      });
-
-      // onReady is the recommended iframe path, after PluginAPI injection is confirmed.
+      inputControls.filter((control) => control !== els.tasks).forEach((control) => control.addEventListener('change', invalidatePreview));
       waitForPluginApi().then((api) => {
         plugin = api;
-        if (!plugin) {
-          showApiUnavailableError();
-          return;
-        }
-        if (plugin.onReady) plugin.onReady(init);
-        else init();
+        if (!plugin) { showApiUnavailableError(); return; }
+        if (plugin.onReady) plugin.onReady(init); else init();
       });
     })();
   </script>

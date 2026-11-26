@@ -1,8 +1,8 @@
 {
   "id": "bulk-add-tasks",
-  "name": "Bulk Add Tasks",
-  "version": "0.1.2",
-  "description": "Create many Super Productivity tasks at once from pasted text, with project headings, subtasks, existing tags and inline notes.",
+  "name": "Taskdown",
+  "version": "0.2.0",
+  "description": "Bulk create super productivity tasks from a simple markdown style list, with subtasks and categorized checklists ",
   "manifestVersion": 1,
   "minSupVersion": "18.16.0",
   "author": "initialcrow",
