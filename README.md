@@ -2,6 +2,32 @@
 
 A Markdown-first task importer for [Super Productivity](https://super-productivity.com/). Create structured tasks, subtasks, and categorized checklists from a simple text format, review the result, and import it through the official Plugin API.
 
+## Who is Taskdown for?
+
+Taskdown is designed for people who prefer planning their work in Markdown but use Super Productivity to manage and track their tasks. plus people who want to add multiple tasks to SP instantly. 
+
+It may be particularly useful for:
+
+- **Students:** Break assignments, coursework, and study plans into tasks and checklists.
+- **Researchers:** Organize literature reviews, research activities, and writing milestones.
+- **Developers:** Turn project plans, feature breakdowns, and development checklists into manageable tasks.
+- **Markdown and AI users:** Convert structured Markdown plans and AI-generated task lists into Super Productivity tasks without creating everything manually.
+
+The goal is simple: make it easier to move from planning to actually managing your work.
+
+## Feedback and Contributions
+
+Taskdown is still evolving, and feedback is welcome!
+
+
+## Future Direction
+
+The long-term goal is to make Taskdown a reliable Markdown-based task import and export tool for Super Productivity.
+
+Once the plugin is sufficiently tested, documented, and stable, I hope to propose it for inclusion in the official Super Productivity project.
+
+Until then, Taskdown will continue to develop independently, with feedback from users helping guide its direction.
+
 ## Features
 
 - Create tasks and subtasks using indentation.
